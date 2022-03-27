@@ -1,0 +1,3 @@
+func void nt_log(string msg) external;
+
+func string nt_get_os_info() external;

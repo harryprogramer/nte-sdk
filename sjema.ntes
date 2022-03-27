@@ -1,0 +1,12 @@
+$use "kernel.ntes"
+
+func void ntex_init(string param1, int siema) {
+    nt_get_os_info();
+    return "kljknl";
+}
+
+func void ntex_loop() {
+
+}
+
+.end

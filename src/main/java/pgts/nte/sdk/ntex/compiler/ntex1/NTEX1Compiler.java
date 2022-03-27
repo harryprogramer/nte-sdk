@@ -89,10 +89,19 @@ public class NTEX1Compiler implements NTEXCompiler {
 
     private static class CompiledNTEXMethod extends NTEXMethod {
         private final AtomicInteger varIds = new AtomicInteger(0);
-        private final Map<String, String> variables = new HashMap<>();
+        private final Map<String, Integer> variables_registry = new HashMap<>();
+        private final Map<Integer, String> variables = new HashMap<>();
         private final Map<String, NTEXMethod> availableMethods;
         private final ByteArrayDataOutput out;
         private final String line;
+
+        enum ArithmeticOperator{
+            PLUS,
+            MINUS,
+            DIVIDE,
+            MULTIPLY,
+            MODULO
+        }
 
         public CompiledNTEXMethod(String line, NTEXMethod method, Map<String, NTEXMethod> availableMethods) {
             super(method.getName(), method.getParams(), method.isExternal(), method.getReturnType());
@@ -108,6 +117,42 @@ public class NTEX1Compiler implements NTEXCompiler {
                 e.printStackTrace();
             }
 
+        }
+
+        private static ArithmeticOperator getOperator(String data){
+            if(data.indexOf('+') != -1){
+                return ArithmeticOperator.PLUS;
+            }else if(data.indexOf('-') != -1){
+                return ArithmeticOperator.MINUS;
+            }else if(data.indexOf('/') != -1){
+              return ArithmeticOperator.DIVIDE;
+            }else if(data.indexOf('%') != -1){
+              return ArithmeticOperator.MODULO;
+            }else if(data.indexOf('*') != -1){
+              return ArithmeticOperator.MULTIPLY;
+            } else {
+                throw new RuntimeException("unknown operator: " + data);
+            }
+        }
+
+        private static byte getOperatorInstruction(ArithmeticOperator operator){
+            switch (operator){
+                case PLUS -> {return 0x08;}
+                case MINUS -> {return 0x09;}
+                case DIVIDE -> {return 0x0A;}
+                case MULTIPLY -> {return 0x0B;}
+                case MODULO -> {return 0x0C;}
+                default -> {
+                    assert true; // unknown operator
+                    return -1;
+                }
+            }
+        }
+
+        private static boolean isArithmetic(String data){
+            return data.indexOf('+') != -1 || data.indexOf('-') != -1 ||
+                    data.indexOf('/') != -1 || data.indexOf('%') != -1 ||
+                    data.indexOf('*') != -1;
         }
 
         private void compileFunction() throws IOException{ // kompilacja funkcji
@@ -126,10 +171,33 @@ public class NTEX1Compiler implements NTEXCompiler {
                     int id = varIds.getAndIncrement();
                     out.writeInt(id);
                     String value = data.substring(data.indexOf('=') + 1).trim();
-                    out.writeInt(Integer.parseInt(value));
                     String varName = data.substring(data.indexOf(' '), data.indexOf('=') - 1).trim();
-                    System.out.println(varName + " id: " + id + " = " + value);
-                    variables.put(varName, value);
+                    if(isArithmetic(value)){
+                        System.out.println("AOR: " + data);
+                        ArithmeticOperator operator = getOperator(value);
+                        assert operator != null;
+                        out.writeByte(0x0d);
+                        if(StringUtils.isNumeric(value.substring(0, value.indexOf(' ')))){
+                            out.writeByte(0x0f);
+                        }else {
+                            String var = value.substring(0, value.indexOf(' '));
+                            if(!variables_registry.containsKey(var)){
+                                throw new RuntimeException("unknown reference to " + var + " on " + data);
+                            }else {
+                                int varId = variables_registry.get(var);
+                                out.writeByte(0x10);
+                                out.writeInt(varId);
+                            }
+                        }
+
+                    }else if(value.length() != 0 && StringUtils.isNumeric(value)){
+                        System.out.println("SD: " + data);
+                    }else {
+
+                        throw new RuntimeException("unknown operator on: "  + data);
+                    }
+                    variables_registry.put(varName, id);
+                    variables.put(id, value);
                 }else if(data.indexOf('(') != -1 && availableMethods.containsKey(data.substring(0, data.indexOf('(')))){ // jesli instrukcja zawiera nazwe znanej funkcji skompiluj jako wywolanie
                     String name = data.substring(0, data.indexOf('(')); // wyodrebianie nazwy funkcji
                     System.out.println("calling declaration: " + name);
@@ -143,9 +211,7 @@ public class NTEX1Compiler implements NTEXCompiler {
                         System.out.println("sreturn: " + data.substring(data.indexOf(' ') + 2, data.length() - 1));
                     }else if(StringUtils.isNumeric(data.substring(data.indexOf(' ')))){
                         System.out.println("returned type: sreturn (number): " + data.substring(data.indexOf(' ')));
-                    } else if(data.indexOf('+') != -1 || data.indexOf('-') != -1 ||  // arithmetic function (areturn)
-                            data.indexOf('/') != -1 || data.indexOf('%') != -1 ||
-                            data.indexOf('*') != -1){
+                    } else if(isArithmetic(data)){
                         System.out.println("areturn");
                     }else if(variables.containsKey(data.substring(data.indexOf(' ')))){ // pointer return (preturn)
                         System.out.println("returned type is preturn");

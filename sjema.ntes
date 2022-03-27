@@ -1,8 +1,11 @@
 $use "kernel.ntes"
 
 func void ntex_init(string param1, int siema) {
-    nt_get_os_info();
-    return "kljknl";
+    int a = 1;
+    int b = 3;
+    int wynik = 3 + 1;
+
+    return "test return";
 }
 
 func void ntex_loop() {

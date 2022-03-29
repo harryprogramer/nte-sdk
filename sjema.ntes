@@ -1,7 +1,7 @@
 $use "kernel.ntes"
 
-func void ntex_init(string param1, int siema) {
-    int a = 1;
+func void ntex_init(string param1) {
+    int a = 29000;
     int b = 3;
     int wynik = 3 + 1;
 

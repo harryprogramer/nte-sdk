@@ -14,9 +14,6 @@ class NTEX1CompilerTest {
 
     @org.junit.jupiter.api.Test
     void compile() throws IOException {
-        NTEX1Compiler.NTExecutableBuilder builder =
-                new NTEX1Compiler.NTExecutableBuilder(20, 2, "siema", 655, 255, 90000);
-        Files.write(Path.of("APP.NTE"), builder.build());
 
         NTEXCompiler compiler = new NTEX1Compiler();
         compiler.compile("sjema.ntes");

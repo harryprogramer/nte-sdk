@@ -7,12 +7,29 @@ public class NTEXMethod {
     private final Map<String, String> params;
     private final boolean isExternal;
     private final String returnType;
+    private final int line;
 
-    public NTEXMethod(String name, Map<String, String> params, boolean isExternal, String returnType){
+    public enum ArithmeticOperator{
+        PLUS('+'),
+        MINUS('-'),
+        DIVIDE('/'),
+        MULTIPLY('*'),
+        MODULO('%')
+        ;
+
+        public final char symbol;
+
+        ArithmeticOperator(char symbol){
+            this.symbol = symbol;
+        }
+    }
+
+    public NTEXMethod(String name, Map<String, String> params, boolean isExternal, String returnType, int line){
         this.name = name;
         this.params = params;
         this.isExternal = isExternal;
         this.returnType = returnType;
+        this.line = line;
     }
 
     public String getName() {
@@ -25,6 +42,10 @@ public class NTEXMethod {
 
     public boolean isExternal() {
         return isExternal;
+    }
+
+    public int getLine() {
+        return line;
     }
 
     public String getReturnType() {

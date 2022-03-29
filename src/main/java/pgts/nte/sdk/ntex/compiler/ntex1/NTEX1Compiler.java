@@ -2,6 +2,7 @@ package pgts.nte.sdk.ntex.compiler.ntex1;
 
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import pgts.nte.sdk.ntex.NTEXMethod;
 import pgts.nte.sdk.ntex.compiler.NTEXCompiler;
@@ -9,32 +10,46 @@ import pgts.nte.sdk.ntex.compiler.NTEXCompiler;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static pgts.nte.sdk.ntex.compiler.ntex1.NTEX1Instructions.*;
+
 public class NTEX1Compiler implements NTEXCompiler {
+    private static AtomicInteger varIds;
     // instructions:
-    // int (variable) - 0x01
-    // string (variable) - 0x02
-    // call (call funtion) - 0x03
-    // modify variable -    0x04
-    // preturn -            0x05 (pointer return)
-    // areturn -            0x06 (arithmetic return)
-    // sreturn -            0x07 (static return)
-    // add  -               0x08
-    // subtract -           0x09
-    // divide  -            0x0A
-    // multiply -           0x0B
-    // modulo  -            0x0C
-    // artihmetic operation requeired (AOR) - 0x0D
-    // AOR END -  0x0E
-    // static declare (SD) -    0x0F
-    // get pointer value (GPV) - 0x10
+    // int  - 0x01 - 01
+    // string - 0x02 - 02
+    // call (call funtion) - 0x03 - 03
+    // modify variable -    0x04 - 04
+    // preturn -            0x05 (pointer return) -    05
+    // areturn -            0x06 (arithmetic return) - 06
+    // sreturn -            0x07 (static return) - 07
+    // add  -               0x08 - 08
+    // subtract -           0x09 - 09
+    // divide  -            0x0A - 10
+    // multiply -           0x0B - 11
+    // modulo  -            0x0C - 12
+    // artihmetic operation requeired (AOR) - 0x0D - 13
+    // AOR END -  0x0E              - 14
+    // static declare (SD) -    0x0F - 15
+    // get pointer value (GPV) - 0x10 - 16
+    // void -                   0x11 - 17
 
 
     private final Map<String, NTEXMethod> methods = new HashMap<>();
     private final Map<String, CompiledNTEXMethod> methods_implementations = new HashMap<>();
+
+    public NTEX1Compiler(){
+        System.out.println("creating compiler ntexc1");
+        varIds = new AtomicInteger(1);
+    }
 
     public static class NTExecutableBuilder {
         private final int app_version, data_size;
@@ -50,6 +65,7 @@ public class NTEX1Compiler implements NTEXCompiler {
             this.data_size = data_size;
             this.perm_size = (short) perm_size;
             this.file_size = file_size;
+
             if(name.length() > 12){
                 throw new RuntimeException("name too long");
             }
@@ -69,7 +85,7 @@ public class NTEX1Compiler implements NTEXCompiler {
                     buffer.put((byte)(0xff & name.charAt(i)));
                 }
             }
-            System.out.println(buffer.position());
+            //System.out.println(buffer.position());
             buffer.putInt(data_size); // 4 bytes
             buffer.putShort(perm_size); // 2 bytes
             buffer.putLong(file_size); //  8 bytes
@@ -81,38 +97,29 @@ public class NTEX1Compiler implements NTEXCompiler {
 
             long end = System.currentTimeMillis();
 
-            System.out.println("build success in " + (end - start) / 1000.0 + "s");
+            //System.out.println("build success in " + (end - start) / 1000.0 + "s");
 
             return arr;
         }
     }
 
     private static class CompiledNTEXMethod extends NTEXMethod {
-        private final AtomicInteger varIds = new AtomicInteger(0);
         private final Map<String, Integer> variables_registry = new HashMap<>();
         private final Map<Integer, String> variables = new HashMap<>();
         private final Map<String, NTEXMethod> availableMethods;
         private final ByteArrayDataOutput out;
         private final String line;
 
-        enum ArithmeticOperator{
-            PLUS,
-            MINUS,
-            DIVIDE,
-            MULTIPLY,
-            MODULO
-        }
-
-        public CompiledNTEXMethod(String line, NTEXMethod method, Map<String, NTEXMethod> availableMethods) {
-            super(method.getName(), method.getParams(), method.isExternal(), method.getReturnType());
+        public CompiledNTEXMethod(String line, NTEXMethod method, Map<String, NTEXMethod> availableMethods, int lineCount) {
+            super(method.getName(), method.getParams(), method.isExternal(), method.getReturnType(), lineCount);
             this.availableMethods = availableMethods;
             this.out = ByteStreams.newDataOutput();
             this.line = line;
             try {
                 compileFunction();
-                try (OutputStream outputStream = new FileOutputStream(getName() + ".method")) {
-                    outputStream.write(out.toByteArray());
-                }
+                //try (OutputStream outputStream = new FileOutputStream(getName() + ".method")) {
+                //    outputStream.write(out.toByteArray());
+                //}
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -137,11 +144,11 @@ public class NTEX1Compiler implements NTEXCompiler {
 
         private static byte getOperatorInstruction(ArithmeticOperator operator){
             switch (operator){
-                case PLUS -> {return 0x08;}
-                case MINUS -> {return 0x09;}
-                case DIVIDE -> {return 0x0A;}
-                case MULTIPLY -> {return 0x0B;}
-                case MODULO -> {return 0x0C;}
+                case PLUS -> {return ntexAdd;}
+                case MINUS -> {return ntexSubtract;}
+                case DIVIDE -> {return ntexDivide;}
+                case MULTIPLY -> {return ntexMultiply;}
+                case MODULO -> {return ntexModulo;}
                 default -> {
                     assert true; // unknown operator
                     return -1;
@@ -156,42 +163,47 @@ public class NTEX1Compiler implements NTEXCompiler {
         }
 
         private void compileFunction() throws IOException{ // kompilacja funkcji
-            System.out.println(getName());
+            //System.out.println(getName());
             String code = line.substring(line.indexOf('{') + 1, line.indexOf('}')); // wyodrebnij sam kod
             if(code.length() == 0){
-                System.out.println("------------");
+                //System.out.println("------------");
                 return;
             }
 
             for(String data : code.split("\\s*;\\s*")){ // petla instrukcji
                 int latestSpace = data.indexOf(' ');
-
+                String value = data.substring(data.indexOf('=') + 1).trim();
                 if(latestSpace != -1 && data.substring(0, data.indexOf(' ')).equals("int")){ // jesli instrukcja rozpoczyna sie od int skompiluj jako zmienna
-                    out.writeByte(0x01); // zapisywanie że jest to instrukcja deklaracji zmiennej int
+                    out.write(ntexInt); // zapisywanie że jest to instrukcja deklaracji zmiennej int
                     int id = varIds.getAndIncrement();
+                    System.out.println("id: " + id);
                     out.writeInt(id);
-                    String value = data.substring(data.indexOf('=') + 1).trim();
                     String varName = data.substring(data.indexOf(' '), data.indexOf('=') - 1).trim();
+                    //System.out.println(varName + " : " + id);
                     if(isArithmetic(value)){
-                        System.out.println("AOR: " + data);
+                        //System.out.println("AOR: " + data);
                         ArithmeticOperator operator = getOperator(value);
                         assert operator != null;
-                        out.writeByte(0x0d);
+                        out.write(ntexAor);
+                        //System.out.println(value.substring(0, value.indexOf(' ')));
                         if(StringUtils.isNumeric(value.substring(0, value.indexOf(' ')))){
-                            out.writeByte(0x0f);
+                            out.write(ntexSd);
+                            out.writeInt(Integer.parseInt(value.substring(0, value.indexOf(' '))));
                         }else {
                             String var = value.substring(0, value.indexOf(' '));
                             if(!variables_registry.containsKey(var)){
                                 throw new RuntimeException("unknown reference to " + var + " on " + data);
                             }else {
                                 int varId = variables_registry.get(var);
-                                out.writeByte(0x10);
+                                out.write(ntexGpv);
                                 out.writeInt(varId);
                             }
                         }
 
                     }else if(value.length() != 0 && StringUtils.isNumeric(value)){
                         System.out.println("SD: " + data);
+                        out.write(ntexSd);
+                        out.writeInt(Integer.parseInt(value));
                     }else {
 
                         throw new RuntimeException("unknown operator on: "  + data);
@@ -200,21 +212,21 @@ public class NTEX1Compiler implements NTEXCompiler {
                     variables.put(id, value);
                 }else if(data.indexOf('(') != -1 && availableMethods.containsKey(data.substring(0, data.indexOf('(')))){ // jesli instrukcja zawiera nazwe znanej funkcji skompiluj jako wywolanie
                     String name = data.substring(0, data.indexOf('(')); // wyodrebianie nazwy funkcji
-                    System.out.println("calling declaration: " + name);
-                    out.writeByte(0x03); // zapisywanie ze jest to instrukcja dzwoniąca
-                    out.writeByte(name.length()); // zapisywanie rozmiaru nazwy funkji
+                    //System.out.println("calling declaration: " + name);
+                    out.write(ntexCall); // zapisywanie ze jest to instrukcja dzwoniąca
+                    out.write(name.length()); // zapisywanie rozmiaru nazwy funkji
                     for(int i = 0; i < name.length(); i++){ // zapisywanie nazwy
-                        out.writeByte((byte) (0xff & name.charAt(i)));
+                        out.write((byte) (0xff & name.charAt(i)));
                     }
                 }else if(data.contains("return")){
                     if(data.indexOf('"') != -1 && data.substring(data.indexOf('"') + 1).indexOf('"') != -1){ // static string return (sreturn)
-                        System.out.println("sreturn: " + data.substring(data.indexOf(' ') + 2, data.length() - 1));
+                        //System.out.println("sreturn: " + data.substring(data.indexOf(' ') + 2, data.length() - 1));
                     }else if(StringUtils.isNumeric(data.substring(data.indexOf(' ')))){
-                        System.out.println("returned type: sreturn (number): " + data.substring(data.indexOf(' ')));
+                        //System.out.println("returned type: sreturn (number): " + data.substring(data.indexOf(' ')));
                     } else if(isArithmetic(data)){
-                        System.out.println("areturn");
-                    }else if(variables.containsKey(data.substring(data.indexOf(' ')))){ // pointer return (preturn)
-                        System.out.println("returned type is preturn");
+                        //System.out.println("areturn");
+                    }else if(variables_registry.containsKey(data.substring(data.indexOf(' ')))){ // pointer return (preturn)
+                        //System.out.println("returned type is preturn");
                     }else {
                         throw new RuntimeException("unknown return type for function: " + getName());
                     }
@@ -223,7 +235,7 @@ public class NTEX1Compiler implements NTEXCompiler {
                     throw new RuntimeException("Undefined instruction: " + data); // niezdefiniowana instrukcja
                 }
             }
-            System.out.println("------------");
+            //System.out.println("------------");
         }
 
 
@@ -233,7 +245,7 @@ public class NTEX1Compiler implements NTEXCompiler {
     }
 
 
-    private NTEXMethod parseMethod(String line){
+    private NTEXMethod parseMethod(String line, int lineNumber){
         line = line.trim();
         line = line.replaceAll(" +", " ");
         if(!line.substring(0, 4).equalsIgnoreCase("func")){
@@ -252,7 +264,7 @@ public class NTEX1Compiler implements NTEXCompiler {
             }
         }
 
-        return new NTEXMethod(name, method_params, isexternal, returnType);
+        return new NTEXMethod(name, method_params, isexternal, returnType, lineNumber);
     }
 
     private void load_lib(String filename){
@@ -264,16 +276,18 @@ public class NTEX1Compiler implements NTEXCompiler {
         }
     }
 
-    private void loadDeclaration(String line){
-        NTEXMethod method = parseMethod(line);
-        System.out.println("declaration: " + method.getName());
+    private void loadDeclaration(String line, int lineNumber){
+        NTEXMethod method = parseMethod(line, lineNumber);
+        //System.out.println("declaration: " + method.getName());
         methods.put(method.getName(), method);
     }
 
     private void compileSource(BufferedReader br) throws IOException {
         String st;
+        int lineCounter = 0;
         while (true) {
             st = br.readLine();
+            lineCounter++;
             if(st == null){
                 break;
             }
@@ -281,7 +295,7 @@ public class NTEX1Compiler implements NTEXCompiler {
             st = st.trim();
 
             if(st.equalsIgnoreCase(".end")){
-                System.out.println("end file");
+                //System.out.println("end file");
                 break;
             }
 
@@ -299,7 +313,7 @@ public class NTEX1Compiler implements NTEXCompiler {
             if (st.length() > 4) {
                 if (st.substring(0, 4).equalsIgnoreCase("func")) {
                     if(st.lastIndexOf(';') == st.length() - 1){
-                        loadDeclaration(st);
+                        loadDeclaration(st, lineCounter);
                     }else {
                         StringBuilder builder = new StringBuilder();
                         while (true) {
@@ -319,13 +333,30 @@ public class NTEX1Compiler implements NTEXCompiler {
                                 break;
                             }
                         }
-                        NTEXMethod method = parseMethod(builder.toString());
-                        CompiledNTEXMethod compiledNTEXMethod = new CompiledNTEXMethod(builder.toString(), method, methods);
+                        NTEXMethod method = parseMethod(builder.toString(), lineCounter);
+                        CompiledNTEXMethod compiledNTEXMethod = new CompiledNTEXMethod(builder.toString(), method, methods, lineCounter);
                         methods.put(method.getName(), method);
                         methods_implementations.put(method.getName(), compiledNTEXMethod);
                     }
                 }
 
+            }
+        }
+    }
+
+    private static byte getDataType(String type){
+        switch (type) {
+            case "void" -> {
+                return ntexVoid;
+            }
+            case "int" -> {
+                return ntexInt;
+            }
+            case "string" -> {
+                return ntexString;
+            }
+            default -> {
+                return -1;
             }
         }
     }
@@ -340,20 +371,43 @@ public class NTEX1Compiler implements NTEXCompiler {
         } catch (IOException ex) {
             ex.printStackTrace();
         }
-
+        String name = FilenameUtils.removeExtension(file);
         ByteArrayDataOutput out =  ByteStreams.newDataOutput();
-        NTExecutableBuilder builder = new NTExecutableBuilder(20, 25, "testapp", 20, 20, 20);
+        NTExecutableBuilder builder = new NTExecutableBuilder(20, 25, name, 20, 20, 20);
         byte[] header = builder.build();
         out.write(header);
         for (var entry : methods_implementations.entrySet()) {
             CompiledNTEXMethod method =  entry.getValue();
-            for(int i = 0; i < method.getName().length(); i++){ // zapisywanie nazwy
-                out.writeByte((byte) (0xff & method.getName().charAt(i)));
+            byte dataType = getDataType(method.getReturnType());
+            if(dataType == -1){
+                throw new RuntimeException("function: " + method.getName() + " has unknown return type: " + method.getReturnType());
             }
-            out.write(method.getOut().toByteArray());
+            out.write(0xff); // function begin
+            out.write(dataType); // function return type
+            if(method.getName().length() > 256){
+                throw new RuntimeException("function at line: " + method.getLine() + " has to long name");
+            }
+            out.write(method.getName().length()); // function name length
+            for(int i = 0; i < method.getName().length(); i++){ // function name
+                out.write((byte) (0xff & method.getName().charAt(i)));
+            }
+            out.write(method.getParams().size());
+            for (var param : method.getParams().entrySet()) {
+                byte paramDataType = getDataType(param.getKey());
+                int paramId = varIds.getAndIncrement();
+                if(paramDataType == -1){
+                    throw new RuntimeException("param at function at line " + method.getLine() + " has unknown data type");
+                }
+                System.out.println("param: " + param + " has id " + varIds + " " + paramDataType);
+                out.write(paramDataType);
+                out.writeInt(paramId);
+            }
+            byte[] compiledCode = method.getOut().toByteArray();
+            System.out.println(Arrays.toString(compiledCode));
+            out.write(compiledCode); // function body
         }
 
-        try(OutputStream outputStream = new FileOutputStream("APP2.NTE")) {
+        try(OutputStream outputStream = new FileOutputStream(name.toUpperCase() + ".NTE")) {
             outputStream.write(out.toByteArray());
         } catch (IOException e) {
             e.printStackTrace();

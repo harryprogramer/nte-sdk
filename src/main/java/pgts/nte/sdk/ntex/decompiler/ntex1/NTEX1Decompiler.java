@@ -1,5 +1,7 @@
 package pgts.nte.sdk.ntex.decompiler.ntex1;
 
+import pgts.nte.sdk.ntex.NTEXMethod;
+import pgts.nte.sdk.ntex.compiler.ntex1.NTEX1Compiler;
 import pgts.nte.sdk.ntex.decompiler.NTEXDecompiler;
 
 import java.io.RandomAccessFile;
@@ -8,7 +10,22 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
+import static pgts.nte.sdk.ntex.compiler.ntex1.NTEX1Instructions.*;
+
 public class NTEX1Decompiler implements NTEXDecompiler {
+
+    public enum DeclareType {
+        AOR("aor"), SD("sd")
+        ;
+
+        public final String name;
+
+        DeclareType(String name) {
+            this.name = name;
+        }
+
+
+    }
 
     private ByteBuffer getBuffer(String filename){
         ByteBuffer buffer;
@@ -41,6 +58,57 @@ public class NTEX1Decompiler implements NTEXDecompiler {
         return new String(data, StandardCharsets.UTF_8);
     }
 
+    private DeclareType getDeclareType(byte type){
+        if(type == 0x0d){
+            return DeclareType.AOR;
+        }else if(type == 0x0f){
+            return DeclareType.SD;
+        }else{
+            throw new RuntimeException("unknown declare type");
+        }
+    }
+
+    private NTEXMethod.ArithmeticOperator geArithmeticOperator(byte operator){
+        return null;
+    }
+
+    private void dumpInt(ByteBuffer buffer){
+        int startPos = buffer.position();
+        int pointer = buffer.getInt();
+        DeclareType declareType = getDeclareType(buffer.get());
+        String value = "unknown";
+        if(declareType == DeclareType.AOR){
+
+        }else if(declareType == DeclareType.SD){
+            value = String.valueOf(buffer.getInt());
+        }
+        System.out.println("int, " + pointer + ", $" + declareType + " " + value);
+    }
+
+    private void dumpFunctionHeader(ByteBuffer buffer){
+
+    }
+
+    private void dumpFunctions(ByteBuffer buffer){
+        buffer.position(32); // skip header
+        while (buffer.capacity() != buffer.position()){
+            byte currentByte = buffer.get();
+            //System.out.printf(buffer.position() + ": 0x%01X%n", currentByte);
+            switch (currentByte){
+                case (byte) 0xFF -> {
+
+                }
+                case ntexInt -> {
+                    try {
+                        dumpInt(buffer);
+                    }catch (Exception e){
+                        System.out.println("on position " + buffer.position() + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+    }
+
     @Override
     public String dumpInfo(String file) {
         StringBuilder builder = new StringBuilder();
@@ -54,8 +122,13 @@ public class NTEX1Decompiler implements NTEXDecompiler {
             String appName = readString(buffer);
 
             builder.append("decompiler analysis about ").append(file);
+            builder.append("\n\n    header:");
             builder.append("\napp name: ").append(appName);
             builder.append("\napp version: ").append(appVersion);
+            builder.append("\n\n    obj dump:");
+            System.out.println(builder);
+
+            dumpFunctions(buffer);
         }catch (Exception e){
             e.printStackTrace();
         }

@@ -10,6 +10,6 @@ class NTEX1DecompilerTest {
     @Test
     void dumpInfo() {
         NTEXDecompiler decompiler = new NTEX1Decompiler();
-        System.out.println(decompiler.dumpInfo("APP2.NTE"));
+        decompiler.dumpInfo("SJEMA.NTE");
     }
 }

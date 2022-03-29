@@ -186,7 +186,7 @@ public class NTEX1Compiler implements NTEXCompiler {
                         assert operator != null;
                         out.write(ntexAor);
                         //System.out.println(value.substring(0, value.indexOf(' ')));
-                        if(StringUtils.isNumeric(value.substring(0, value.indexOf(' ')))){
+                        if(StringUtils.isNumeric(value.substring(0, value.indexOf(' ')))){ // static declare
                             out.write(ntexSd);
                             out.writeInt(Integer.parseInt(value.substring(0, value.indexOf(' '))));
                         }else {
@@ -199,7 +199,7 @@ public class NTEX1Compiler implements NTEXCompiler {
                                 out.writeInt(varId);
                             }
                         }
-
+                        out.write(ntexAorEnd);
                     }else if(value.length() != 0 && StringUtils.isNumeric(value)){
                         System.out.println("SD: " + data);
                         out.write(ntexSd);

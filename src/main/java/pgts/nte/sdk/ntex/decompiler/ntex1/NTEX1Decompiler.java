@@ -15,7 +15,7 @@ import static pgts.nte.sdk.ntex.compiler.ntex1.NTEX1Instructions.*;
 public class NTEX1Decompiler implements NTEXDecompiler {
 
     public enum DeclareType {
-        AOR("aor"), SD("sd")
+        AOR("aor"), SD("sd"), GPV("gpv")
         ;
 
         public final String name;
@@ -58,13 +58,15 @@ public class NTEX1Decompiler implements NTEXDecompiler {
         return new String(data, StandardCharsets.UTF_8);
     }
 
-    private DeclareType getDeclareType(byte type){
-        if(type == 0x0d){
-            return DeclareType.AOR;
-        }else if(type == 0x0f){
-            return DeclareType.SD;
-        }else{
-            throw new RuntimeException("unknown declare type");
+    private DeclareType getDeclareType(byte type) {
+        switch (type) {
+            case 0x0d -> {
+                return DeclareType.AOR;
+            }
+            case 0x0f -> {
+                return DeclareType.SD;
+            }
+            default -> throw new RuntimeException("unknown declare type");
         }
     }
 
@@ -78,7 +80,12 @@ public class NTEX1Decompiler implements NTEXDecompiler {
         DeclareType declareType = getDeclareType(buffer.get());
         String value = "unknown";
         if(declareType == DeclareType.AOR){
-
+            DeclareType type = getDeclareType(buffer.get());
+            if(type == DeclareType.GPV){
+                value = "gpv $" + buffer.getInt();
+            }else if(type == DeclareType.SD){
+                value = ", " + buffer.getInt();
+            }
         }else if(declareType == DeclareType.SD){
             value = String.valueOf(buffer.getInt());
         }

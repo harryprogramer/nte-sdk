@@ -1,6 +1,7 @@
 package pgts.nte.sdk.ntex.compiler.ntex1;
 
 import pgts.nte.sdk.ntex.compiler.NTEXCompiler;
+import pgts.nte.sdk.ntex.errors.SyntaxException;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class NTEX1CompilerTest {
 
     @org.junit.jupiter.api.Test
-    void compile() throws IOException {
+    void compile() throws IOException, SyntaxException {
 
         NTEXCompiler compiler = new NTEX1Compiler();
         compiler.compile("sjema.ntes");

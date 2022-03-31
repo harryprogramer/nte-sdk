@@ -1,8 +1,11 @@
 package pgts.nte.sdk.ntex.decompiler.ntex1;
 
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.Nullable;
 import pgts.nte.sdk.ntex.NTEXMethod;
 import pgts.nte.sdk.ntex.compiler.ntex1.NTEX1Compiler;
 import pgts.nte.sdk.ntex.decompiler.NTEXDecompiler;
+import pgts.nte.sdk.ntex.errors.BinarySignatureException;
 
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -70,8 +73,16 @@ public class NTEX1Decompiler implements NTEXDecompiler {
         }
     }
 
-    private NTEXMethod.ArithmeticOperator geArithmeticOperator(byte operator){
-        return null;
+    @Contract(pure = true)
+    private NTEXMethod.@Nullable ArithmeticOperator getArithmeticOperator(byte operator){
+        switch(operator){
+            case 0x08 -> {return NTEXMethod.ArithmeticOperator.PLUS;} // add
+            case 0x09 -> {return NTEXMethod.ArithmeticOperator.MINUS;} // subtract
+            case 0x0a -> {return NTEXMethod.ArithmeticOperator.DIVIDE;} // divide
+            case 0x0b -> {return NTEXMethod.ArithmeticOperator.MULTIPLY;} //multiply
+            case 0x0c -> {return NTEXMethod.ArithmeticOperator.MODULO;} // modulo
+            default -> {return null;}
+        }
     }
 
     private void dumpInt(ByteBuffer buffer){
@@ -83,8 +94,12 @@ public class NTEX1Decompiler implements NTEXDecompiler {
             DeclareType type = getDeclareType(buffer.get());
             if(type == DeclareType.GPV){
                 value = "gpv $" + buffer.getInt();
+                System.out.println(getArithmeticOperator(buffer.get()));
             }else if(type == DeclareType.SD){
                 value = ", " + buffer.getInt();
+                System.out.println(buffer.position() + ": " + buffer.get());
+            }else {
+                throw new BinarySignatureException("unknown declare type in aor at " + buffer.position());
             }
         }else if(declareType == DeclareType.SD){
             value = String.valueOf(buffer.getInt());
@@ -109,7 +124,7 @@ public class NTEX1Decompiler implements NTEXDecompiler {
                     try {
                         dumpInt(buffer);
                     }catch (Exception e){
-                        System.out.println("on position " + buffer.position() + ": " + e.getMessage());
+                        System.err.println("on position " + buffer.position() + ": " + e.getMessage());
                     }
                 }
             }

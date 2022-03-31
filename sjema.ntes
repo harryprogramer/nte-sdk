@@ -1,15 +1,11 @@
 $use "kernel.ntes"
 
 func void ntex_init(string param1) {
-    int a = 29000;
-    int b = 3;
-    int wynik = 3 + 1;
+       int a = 2137;
+       int b = 6969;
+       int wynik = 3 + 1;
 
-    return "test return";
-}
-
-func void ntex_loop() {
-
+      return "test return";
 }
 
 .end

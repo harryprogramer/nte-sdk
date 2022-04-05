@@ -97,7 +97,14 @@ public class NTEX1Decompiler implements NTEXDecompiler {
                 System.out.println(getArithmeticOperator(buffer.get()));
             }else if(type == DeclareType.SD){
                 value = ", " + buffer.getInt();
-                System.out.println(buffer.position() + ": " + buffer.get());
+                NTEXMethod.ArithmeticOperator operator;
+                byte operatorByte;
+                do {
+                    operatorByte = buffer.get();
+                    operator = getArithmeticOperator(operatorByte);
+                    value += " " + operator + " " + buffer.getInt();
+                }while (getArithmeticOperator(operatorByte) != null);
+                //System.out.println(buffer.position() + ": " + buffer.get());
             }else {
                 throw new BinarySignatureException("unknown declare type in aor at " + buffer.position());
             }
@@ -124,7 +131,8 @@ public class NTEX1Decompiler implements NTEXDecompiler {
                     try {
                         dumpInt(buffer);
                     }catch (Exception e){
-                        System.err.println("on position " + buffer.position() + ": " + e.getMessage());
+                        System.err.println("on position " + buffer.position() + ": " + e.getClass().toString() +  " " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }
@@ -157,4 +165,8 @@ public class NTEX1Decompiler implements NTEXDecompiler {
         return builder.toString();
     }
 
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+    }
 }

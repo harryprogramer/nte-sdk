@@ -176,14 +176,13 @@ public class NTEX1Compiler implements NTEXCompiler {
 
         private void compileFunction() throws IOException, SyntaxException { // kompilacja funkcji
             String code = line.substring(line.indexOf('{') + 1, line.indexOf('}')); // wyodrebnij sam kod
-            if(code.length() == 0){
-                return;
-            }
 
             for(String data : code.split("\\s*;\\s*")){ // petla instrukcji
-
                 int latestSpace = data.indexOf(' ');
                 String value = data.substring(data.indexOf('=') + 1).trim();
+                if(data.contains("//")){
+                    continue;
+                }
                 if(latestSpace != -1 && data.substring(0, data.indexOf(' ')).equals("int")){ // jesli instrukcja rozpoczyna sie od int skompiluj jako zmienna
                     out.write(ntexInt); // zapisywanie że jest to instrukcja deklaracji zmiennej int
                     int id = varIds.getAndIncrement();
@@ -234,16 +233,16 @@ public class NTEX1Compiler implements NTEXCompiler {
                     for(int i = 0; i < name.length(); i++){ // zapisywanie nazwy
                         out.write((byte) (0xff & name.charAt(i)));
                     }
-                }else if(data.contains("return")){
-                    if(data.indexOf('"') != -1 && data.substring(data.indexOf('"') + 1).indexOf('"') != -1){ // static string return (sreturn)
+                }else if(data.contains("return")) {
+                    if (data.indexOf('"') != -1 && data.substring(data.indexOf('"') + 1).indexOf('"') != -1) { // static string return (sreturn)
                         //System.out.println("sreturn: " + data.substring(data.indexOf(' ') + 2, data.length() - 1));
-                    }else if(StringUtils.isNumeric(data.substring(data.indexOf(' ')))){
+                    } else if (StringUtils.isNumeric(data.substring(data.indexOf(' ')))) {
                         //System.out.println("returned type: sreturn (number): " + data.substring(data.indexOf(' ')));
-                    } else if(isArithmetic(data)){
+                    } else if (isArithmetic(data)) {
                         //System.out.println("areturn");
-                    }else if(variables_registry.containsKey(data.substring(data.indexOf(' ')))){ // pointer return (preturn)
+                    } else if (variables_registry.containsKey(data.substring(data.indexOf(' ')))) { // pointer return (preturn)
                         //System.out.println("returned type is preturn");
-                    }else {
+                    } else {
                         throw new RuntimeException("unknown return type for function: " + getName());
                     }
                 }
